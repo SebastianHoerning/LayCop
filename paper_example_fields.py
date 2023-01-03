@@ -21,7 +21,7 @@ from helper_func import empspast_anisotropic
 import level_sim_conditional
 
 
-def paper_plot(field, statlist_biv_mean):#, d, avvl, avhl):
+def paper_plot(field, statlist_biv_mean):
 
 	fontsize = 10
 	plt.rcParams['font.size'] = fontsize
