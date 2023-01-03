@@ -16,14 +16,12 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import scipy.stats as st
 from statsmodels.distributions.empirical_distribution import ECDF
-from helper_func import covariancefunction as covfun
-from helper_func import empspast_anisotropic
+from helper_func import fftma
 import level_sim_conditional
 import gstools as gs
-import pykrige
 
 # SIMULATE
-n_realisations = 10
+n_realisations = 2
 
 for s in range(n_realisations):
 	covmods = []
@@ -46,17 +44,30 @@ for s in range(n_realisations):
 	cv = condfield[xy[:,0], xy[:,1]]
 
 
-	# OK simulation for tau0fields
+	# OK for cv
 	ok_cov = gs.Exponential(dim=2, var=1, len_scale=22, nugget=0.01)
-	domainsize = (532, 532)
-	gridx = np.arange(0.0, domainsize[0], 1)
-	gridy = np.arange(0.0, domainsize[1], 1)
+	domainsize = (536, 536)
+	mg = np.mgrid[[slice(0, domainsize[i], 1) for i in range(2)]].reshape(2,-1).T
 
-	ok_data = pykrige.OrdinaryKriging(xy[:,0], xy[:,1], cv, ok_cov)
-	z_data, s_data = ok_data.execute("grid", gridx, gridy)
-	z_data = z_data.data.T
+	data_krig = gs.krige.Ordinary(ok_cov, [xy[:,0], xy[:,1]], cv, exact=True)
+	z_data, s_data = data_krig([mg[:,0], mg[:,1]])
+	z_data = z_data.reshape(domainsize)
 	
-	tau0fields = RM.finalFields
+	# FFTMA (without layer cop) for OK simulation for tau0fields
+	fftma_ = fftma.FFTMA(domainsize=domainsize, covmod='0.01 Nug(0.0) + 0.99 Exp(22.0)')
+
+	tau0fields = []
+	for t in range(8):
+		print('Kriging Simulation # {} '.format(t))
+		rand_field = fftma_.simnew()
+		cvrf = rand_field[xy[:,0], xy[:,1]]
+		ok_rf = gs.krige.Ordinary(ok_cov, [xy[:,0], xy[:,1]], cvrf, exact=True)
+		rf_data, ss = ok_rf([mg[:,0], mg[:,1]])
+		rf_data = rf_data.reshape(domainsize)
+		cfield = z_data + (rand_field - rf_data)
+		tau0fields.append(cfield)
+	tau0fields = np.array(tau0fields)
+
 
 	# start conditional layer cop simulation
 	Y = fftmals.condsim(xy, cv, tau0fields, nsteps=70, kbw=10)
