@@ -1,5 +1,5 @@
 #-------------------------------------------------------------------------------
-# Name:        FFT-MA Level-Sim
+# Name:        FFT-MA Level-Sim (Layered Copula)
 # Purpose:     Simulation of non-Gaussian spatial random fields
 #
 # Author:      Dr.-Ing. S. Hoerning
@@ -16,9 +16,8 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import scipy.stats as st
 from statsmodels.distributions.empirical_distribution import ECDF
-from RMWSPy.rmwspy import *
-from helpers import covariancefunction as covfun
-from spastats import varioFFT, empspast_anisotropic
+from helper_func import covariancefunction as covfun
+from helper_func import empspast_anisotropic
 import level_sim_conditional
 
 
@@ -51,16 +50,12 @@ def paper_plot(field, statlist_biv_mean):#, d, avvl, avhl):
 	plt.xticks(fontsize=fontsize)
 	plt.yticks(fontsize=fontsize)
 
-	# rank correlation function
+	# variogram
 	h = statlist_biv_mean['h']
-	# R = statlist_biv_mean['R']
 	v = statlist_biv_mean['variogram']
-	# C = statlist_biv_mean['covariance']
 
 	ax0 = plt.subplot2grid((3,2), (0,1))
 	plt.plot(h, v, 'x-', color='black', label='$\gamma_{iso}(h)$', alpha=0.7)
-	# plt.plot(d, avhl, ':', color='black', label='$\gamma_{major}(h)$', alpha=0.7)
-	# plt.plot(d, avvl, '--', color='black', label='$\gamma_{minor}(h)$', alpha=0.7)
 	plt.plot(statlist_biv_mean['h_major'], statlist_biv_mean['variogram_major'], ':', color='black', label='$\gamma_{major}(h)$', alpha=0.7)
 	plt.plot(statlist_biv_mean['h_minor'], statlist_biv_mean['variogram_minor'], '--', color='black', label='$\gamma_{minor}(h)$', alpha=0.7)
 	leg = plt.legend(loc=4, fancybox=True)
@@ -72,8 +67,7 @@ def paper_plot(field, statlist_biv_mean):#, d, avvl, avhl):
 	plt.ylim(-0.1,1.1)
 	plt.ylabel('Variogram', fontsize=fontsize)
 
-	# ASYMMETRIES
-	# A = statlist_biv_mean['A']
+	# ASYMMETRY
 	Atn = statlist_biv_mean['A_t_normed']
 
 	plt.subplot2grid((3,2), (1,1), sharex=ax0)
@@ -126,6 +120,7 @@ def paper_plot(field, statlist_biv_mean):#, d, avvl, avhl):
 
 ### START EXAMPLES
 seed = 819074
+
 # grid for spast for all examples
 xyz = np.mgrid[[slice(0, 1000, 1) for i in range(2)]].reshape(2, -1).T
 np.random.shuffle(xyz)
@@ -135,540 +130,331 @@ xyz = xyz[:30000]
 lb = np.array([  0, 5, 10, 20,  40,  60,  80, 100, 120, 150, 180, 220, 250])
 
 
-# # example 1: linearly changing Exponential variogram with range from 5 to 80
-# covmods = []
-# nlev = 40
-# ranges = np.linspace(0.0, 1, nlev)[::-1]
-# r1 = 5
-# r2 = 80
-# for ii, r in enumerate(ranges):
-# 	r = (1- ranges[ii])*r1 + ranges[ii]*r2
-# 	covmod =  '0.01 Nug(0.0) + 0.99 Exp({})'.format(r)
-# 	covmods.append(covmod)
-# print(covmods)
+# example 1: linearly changing Exponential variogram with range from 5 to 80
+covmods = []
+nlev = 40
+ranges = np.linspace(0.0, 1, nlev)[::-1]
+r1 = 5
+r2 = 80
+for ii, r in enumerate(ranges):
+	r = (1- ranges[ii])*r1 + ranges[ii]*r2
+	covmod =  '0.01 Nug(0.0) + 0.99 Exp({})'.format(r)
+	covmods.append(covmod)
+print(covmods)
 
-# np.random.seed(seed)
-# fftmals = level_sim_conditional.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, reverse=True)
-# field = fftmals.simnewls()
-# rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
-# Y1 = st.norm.ppf(rfield)
+np.random.seed(seed)
+fftmals = level_sim_conditional.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, reverse=True)
+field = fftmals.simnewls()
+rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
+Y1 = st.norm.ppf(rfield)
 
-# plt.figure()
-# plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
-# plt.colorbar()
-# plt.savefig(r'ex1_conditional_linear.png', dpi=250)
-# plt.clf()
-# plt.close()
+# plot field
+plt.figure()
+plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
+plt.colorbar()
+plt.savefig(r'ex1_conditional_linear.png', dpi=250)
+plt.clf()
+plt.close()
 
-# # spast
-# vals = Y1[xyz[:,0], xyz[:,1]]
-# spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
-# spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
-# spast.plt_stats()
-# plt.savefig('ex1_conditional_statsall.png', dpi=300)
-# plt.clf()
-# plt.close()
+# spast
+vals = Y1[xyz[:,0], xyz[:,1]]
+spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
+spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
 
-# # spast from variofft
-# vfft = varioFFT.varioFFT2D(Y1, icode=1)
-
-# ws = 250
-# w = [int(vfft.shape[i]/2) for i in range(2)]
-# gh = vfft[w[0] - ws : w[0] + ws, w[1] - ws : w[1] + ws]
-
-# # plt.imshow(gh, cmap='jet', origin='lower')
-# # plt.colorbar()
-# # plt.show()
-
-# vl = gh[250, 250:500]
-# hl = gh[250:500, 250]
-# dl45 = gh[250: , 250:]
-# dl45 = np.diag(dl45)
-# dl135 = gh[:250 , 250:][::-1]
-# dl135 = np.diag(dl135)
-
-# # average ll
-# avvl = []
-# avhl = []
-# avdl45 = []
-# avdl135 = []
-# for i in range(21):
-# 	avvl.append(np.mean(vl[i*10 : (i+1)*10]))
-# 	avhl.append(np.mean(hl[i*10 : (i+1)*10]))
-# 	avdl45.append(np.mean(dl45[i*10 : (i+1)*10]))
-# 	avdl135.append(np.mean(dl135[i*10 : (i+1)*10]))
-# avvl = np.array(avvl)
-# avhl = np.array(avhl)
-# avdl45 = np.array(avdl45)
-# avdl135 = np.array(avdl135)
-# d = np.arange(5, avvl.shape[0]*10, 10)
-
-# paper_plot(Y1, spast.statlist_biv[0])#, d[:-3], avvl[:-3], avhl[:-3])
-# plt.savefig('ex1_conditional_stats.png', dpi=250)
-# plt.clf()
-# plt.close()
+# plot
+paper_plot(Y1, spast.statlist_biv[0])
+plt.savefig('ex1_conditional_stats.png', dpi=250)
+plt.clf()
+plt.close()
 
 
-# # example 2: Linearly changing relative nugget from 0.5 to 0.0 with exponential
-# # variogram with range 50
-# covmods = []
-# nlev = 40
-# ranges = np.linspace(0.0, 1, nlev)[::-1]
-# n1 = 0.5
-# n2 = 0.0
-# for ii, r in enumerate(ranges):
-# 	nug = (1- ranges[ii])*n1 + ranges[ii]*n2
-# 	covmod =  '{} Nug(0.0) + {} Exp(50.0)'.format(nug, 1 - nug)
-# 	covmods.append(covmod)
-# print(covmods)
+# example 2: Linearly changing relative nugget from 0.5 to 0.0 with exponential
+# variogram with range 50
+covmods = []
+nlev = 40
+ranges = np.linspace(0.0, 1, nlev)[::-1]
+n1 = 0.5
+n2 = 0.0
+for ii, r in enumerate(ranges):
+	nug = (1- ranges[ii])*n1 + ranges[ii]*n2
+	covmod =  '{} Nug(0.0) + {} Exp(50.0)'.format(nug, 1 - nug)
+	covmods.append(covmod)
+print(covmods)
 
-# np.random.seed(seed)
-# fftmals = level_sim.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, reverse=True)
-# field = fftmals.simnewls()
-# rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
-# Y1 = st.norm.ppf(rfield)
+np.random.seed(seed)
+fftmals = level_sim_conditional.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, reverse=True)
+field = fftmals.simnewls()
+rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
+Y1 = st.norm.ppf(rfield)
 
-# plt.figure()
-# plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
-# plt.colorbar()
-# plt.savefig(r'ex2_linear.png', dpi=250)
-# plt.clf()
-# plt.close()
+# plot field
+plt.figure()
+plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
+plt.colorbar()
+plt.savefig(r'ex2_linear.png', dpi=250)
+plt.clf()
+plt.close()
 
-# # spast
-# vals = Y1[xyz[:,0], xyz[:,1]]
-# spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
-# spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
-# spast.plt_stats()
-# plt.savefig('ex2_statsall.png', dpi=300)
-# plt.clf()
-# plt.close()
+# spast
+vals = Y1[xyz[:,0], xyz[:,1]]
+spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
+spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
 
-# # spast from variofft
-# vfft = varioFFT.varioFFT2D(Y1, icode=1)
-
-# ws = 250
-# w = [int(vfft.shape[i]/2) for i in range(2)]
-# gh = vfft[w[0] - ws : w[0] + ws, w[1] - ws : w[1] + ws]
-
-# vl = gh[250, 250:500]
-# hl = gh[250:500, 250]
-# dl45 = gh[250: , 250:]
-# dl45 = np.diag(dl45)
-# dl135 = gh[:250 , 250:][::-1]
-# dl135 = np.diag(dl135)
-
-# # average ll
-# avvl = []
-# avhl = []
-# avdl45 = []
-# avdl135 = []
-# for i in range(21):
-# 	avvl.append(np.mean(vl[i*10 : (i+1)*10]))
-# 	avhl.append(np.mean(hl[i*10 : (i+1)*10]))
-# 	avdl45.append(np.mean(dl45[i*10 : (i+1)*10]))
-# 	avdl135.append(np.mean(dl135[i*10 : (i+1)*10]))
-# avvl = np.array(avvl)
-# avhl = np.array(avhl)
-# avdl45 = np.array(avdl45)
-# avdl135 = np.array(avdl135)
-# d = np.arange(5, avvl.shape[0]*10, 10)
-
-# paper_plot(Y1, spast.statlist_biv[0])#, d[:-3], avvl[:-3], avhl[:-3])
-# plt.savefig('ex2_stats.png', dpi=250)
-# plt.clf()
-# plt.close()
+# plot
+paper_plot(Y1, spast.statlist_biv[0])
+plt.savefig('ex2_stats.png', dpi=250)
+plt.clf()
+plt.close()
 
 
-# # example 3: Linearly changing relative nugget from 0.5 to 0.0 with exponential
-# # variogram with range changing from 5 to 80
-# covmods = []
-# nlev = 40
-# ranges = np.linspace(0.0, 1, nlev)[::-1]
-# r1 = 5
-# r2 = 80
-# n1 = 0.5
-# n2 = 0.0
-# for ii, r in enumerate(ranges):
-# 	r = (1- ranges[ii])*r1 + ranges[ii]*r2
-# 	nug = (1- ranges[ii])*n1 + ranges[ii]*n2
-# 	covmod =  '{} Nug(0.0) + {} Exp({})'.format(nug, 1 - nug, r)
-# 	covmods.append(covmod)
-# print(covmods)
+# example 3: Linearly changing relative nugget from 0.5 to 0.0 with exponential
+# variogram with range changing from 5 to 80
+covmods = []
+nlev = 40
+ranges = np.linspace(0.0, 1, nlev)[::-1]
+r1 = 5
+r2 = 80
+n1 = 0.5
+n2 = 0.0
+for ii, r in enumerate(ranges):
+	r = (1- ranges[ii])*r1 + ranges[ii]*r2
+	nug = (1- ranges[ii])*n1 + ranges[ii]*n2
+	covmod =  '{} Nug(0.0) + {} Exp({})'.format(nug, 1 - nug, r)
+	covmods.append(covmod)
+print(covmods)
 
-# np.random.seed(seed)
-# fftmals = level_sim.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, reverse=True)
-# field = fftmals.simnewls()
-# rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
-# Y1 = st.norm.ppf(rfield)
+np.random.seed(seed)
+fftmals = level_sim_conditional.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, reverse=True)
+field = fftmals.simnewls()
+rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
+Y1 = st.norm.ppf(rfield)
 
-# plt.figure()
-# plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
-# plt.colorbar()
-# plt.savefig(r'ex3_linear.png', dpi=250)
-# plt.clf()
-# plt.close()
+# plot field
+plt.figure()
+plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
+plt.colorbar()
+plt.savefig(r'ex3_linear.png', dpi=250)
+plt.clf()
+plt.close()
 
-# # spast
-# vals = Y1[xyz[:,0], xyz[:,1]]
-# spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
-# spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
-# spast.plt_stats()
-# plt.savefig('ex3_statsall.png', dpi=300)
-# plt.clf()
-# plt.close()
+# spast
+vals = Y1[xyz[:,0], xyz[:,1]]
+spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
+spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
 
-# # spast from variofft
-# vfft = varioFFT.varioFFT2D(Y1, icode=1)
-
-# ws = 250
-# w = [int(vfft.shape[i]/2) for i in range(2)]
-# gh = vfft[w[0] - ws : w[0] + ws, w[1] - ws : w[1] + ws]
-
-# vl = gh[250, 250:500]
-# hl = gh[250:500, 250]
-# dl45 = gh[250: , 250:]
-# dl45 = np.diag(dl45)
-# dl135 = gh[:250 , 250:][::-1]
-# dl135 = np.diag(dl135)
-
-# # average ll
-# avvl = []
-# avhl = []
-# avdl45 = []
-# avdl135 = []
-# for i in range(21):
-# 	avvl.append(np.mean(vl[i*10 : (i+1)*10]))
-# 	avhl.append(np.mean(hl[i*10 : (i+1)*10]))
-# 	avdl45.append(np.mean(dl45[i*10 : (i+1)*10]))
-# 	avdl135.append(np.mean(dl135[i*10 : (i+1)*10]))
-# avvl = np.array(avvl)
-# avhl = np.array(avhl)
-# avdl45 = np.array(avdl45)
-# avdl135 = np.array(avdl135)
-# d = np.arange(5, avvl.shape[0]*10, 10)
-
-# paper_plot(Y1, spast.statlist_biv[0])#, d[:-3], avvl[:-3], avhl[:-3])
-# plt.savefig('ex3_stats.png', dpi=250)
-# plt.clf()
-# plt.close()
+# plot
+paper_plot(Y1, spast.statlist_biv[0])
+plt.savefig('ex3_stats.png', dpi=250)
+plt.clf()
+plt.close()
 
 
-# # example 4: Linearly changing exponential variogram with range from 20 to 80 and anisotropy in either
-# # high or low values
-# for c in range(4):
-# 	if c == 0:
-# 		# case 1: low vals with low range and ani
-# 		covmods = []
-# 		anisotropies = []
-# 		nlev = 40
-# 		ranges = np.linspace(0.0, 1, nlev)#[::-1]
-# 		r1 = 80
-# 		r2 = 5
-# 		a1 = 1
-# 		a2 = 0.2
-# 		for ii, r in enumerate(ranges):
-# 			r = (1- ranges[ii])*r1 + ranges[ii]*r2
-# 			af = (1- ranges[ii])*a1 + ranges[ii]*a2
-# 			ani = (1, af, 25)
-# 			covmod =  '0.01 Nug(0.0) + 0.99 Exp({})'.format(r)
-# 			covmods.append(covmod)
-# 			anisotropies.append(ani)
-# 		print(covmods)
+# example 4: Linearly changing exponential variogram with range from 20 to 80 and anisotropy in either
+# high or low values
+for c in range(4):
+	if c == 0:
+		# case 1: low vals with low range and ani
+		covmods = []
+		anisotropies = []
+		nlev = 40
+		ranges = np.linspace(0.0, 1, nlev)#[::-1]
+		r1 = 80
+		r2 = 5
+		a1 = 1
+		a2 = 0.2
+		for ii, r in enumerate(ranges):
+			r = (1- ranges[ii])*r1 + ranges[ii]*r2
+			af = (1- ranges[ii])*a1 + ranges[ii]*a2
+			ani = (1, af, 25)
+			covmod =  '0.01 Nug(0.0) + 0.99 Exp({})'.format(r)
+			covmods.append(covmod)
+			anisotropies.append(ani)
+		print(covmods)
 
-# 		np.random.seed(seed)
-# 		fftmals = level_sim.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, anisotropies=anisotropies, reverse=True)
-# 		field = fftmals.simnewls()
-# 		rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
-# 		Y1 = st.norm.ppf(rfield)
+		np.random.seed(seed)
+		fftmals = level_sim_conditional.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, anisotropies=anisotropies, reverse=True)
+		field = fftmals.simnewls()
+		rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
+		Y1 = st.norm.ppf(rfield)
 
-# 	elif c == 1:
-# 		# case 2: high vals with high range and ani
-# 		covmods = []
-# 		anisotropies = []
-# 		nlev = 40
-# 		ranges = np.linspace(0.0, 1, nlev)#[::-1]
-# 		r1 = 80
-# 		r2 = 5
-# 		a1 = 0.2
-# 		a2 = 1
-# 		for ii, r in enumerate(ranges):
-# 			r = (1- ranges[ii])*r1 + ranges[ii]*r2
-# 			af = (1- ranges[ii])*a1 + ranges[ii]*a2
-# 			ani = (1, af, 25)
-# 			covmod =  '0.01 Nug(0.0) + 0.99 Exp({})'.format(r)
-# 			covmods.append(covmod)
-# 			anisotropies.append(ani)
-# 		print(covmods)
+	elif c == 1:
+		# case 2: high vals with high range and ani
+		covmods = []
+		anisotropies = []
+		nlev = 40
+		ranges = np.linspace(0.0, 1, nlev)#[::-1]
+		r1 = 80
+		r2 = 5
+		a1 = 0.2
+		a2 = 1
+		for ii, r in enumerate(ranges):
+			r = (1- ranges[ii])*r1 + ranges[ii]*r2
+			af = (1- ranges[ii])*a1 + ranges[ii]*a2
+			ani = (1, af, 25)
+			covmod =  '0.01 Nug(0.0) + 0.99 Exp({})'.format(r)
+			covmods.append(covmod)
+			anisotropies.append(ani)
+		print(covmods)
 
-# 		np.random.seed(seed)
-# 		fftmals = level_sim.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, anisotropies=anisotropies, reverse=True)
-# 		field = fftmals.simnewls()
-# 		rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
-# 		Y1 = st.norm.ppf(rfield)
+		np.random.seed(seed)
+		fftmals = level_sim_conditional.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, anisotropies=anisotropies, reverse=True)
+		field = fftmals.simnewls()
+		rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
+		Y1 = st.norm.ppf(rfield)
 
-# 	elif c == 2:
-# 		# case 3: low vals with high range and ani
-# 		covmods = []
-# 		anisotropies = []
-# 		nlev = 40
-# 		ranges = np.linspace(0.0, 1, nlev)#[::-1]
-# 		r1 = 80
-# 		r2 = 5
-# 		a1 = 0.2
-# 		a2 = 1
-# 		for ii, r in enumerate(ranges):
-# 			r = (1- ranges[ii])*r1 + ranges[ii]*r2
-# 			af = (1- ranges[ii])*a1 + ranges[ii]*a2
-# 			ani = (1, af, 25)
-# 			covmod =  '0.01 Nug(0.0) + 0.99 Exp({})'.format(r)
-# 			covmods.append(covmod)
-# 			anisotropies.append(ani)
-# 		print(covmods)
+	elif c == 2:
+		# case 3: low vals with high range and ani
+		covmods = []
+		anisotropies = []
+		nlev = 40
+		ranges = np.linspace(0.0, 1, nlev)#[::-1]
+		r1 = 80
+		r2 = 5
+		a1 = 0.2
+		a2 = 1
+		for ii, r in enumerate(ranges):
+			r = (1- ranges[ii])*r1 + ranges[ii]*r2
+			af = (1- ranges[ii])*a1 + ranges[ii]*a2
+			ani = (1, af, 25)
+			covmod =  '0.01 Nug(0.0) + 0.99 Exp({})'.format(r)
+			covmods.append(covmod)
+			anisotropies.append(ani)
+		print(covmods)
 
-# 		np.random.seed(seed)
-# 		fftmals = level_sim.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, anisotropies=anisotropies)# reverse=True)
-# 		field = fftmals.simnewls()
-# 		rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
-# 		Y1 = st.norm.ppf(rfield)
+		np.random.seed(seed)
+		fftmals = level_sim_conditional.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, anisotropies=anisotropies)# reverse=True)
+		field = fftmals.simnewls()
+		rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
+		Y1 = st.norm.ppf(rfield)
 
-# 	elif c == 3:
-# 		# case 4: overall ani same range
-# 		covmods = []
-# 		anisotropies = []
-# 		nlev = 40
-# 		ranges = np.linspace(0.0, 1, nlev)#[::-1]
-# 		a1 = 1
-# 		a2 = 0.2
-# 		for ii, r in enumerate(ranges):
+	elif c == 3:
+		# case 4: overall ani same range
+		covmods = []
+		anisotropies = []
+		nlev = 40
+		ranges = np.linspace(0.0, 1, nlev)#[::-1]
+		a1 = 1
+		a2 = 0.2
+		for ii, r in enumerate(ranges):
 			
-# 			af = (1- ranges[ii])*a1 + ranges[ii]*a2
-# 			ani = (1, af, 25)
-# 			covmod =  '0.01 Nug(0.0) + 0.99 Exp(50.)'
-# 			covmods.append(covmod)
-# 			anisotropies.append(ani)
-# 		print(covmods)
+			af = (1- ranges[ii])*a1 + ranges[ii]*a2
+			ani = (1, af, 25)
+			covmod =  '0.01 Nug(0.0) + 0.99 Exp(50.)'
+			covmods.append(covmod)
+			anisotropies.append(ani)
+		print(covmods)
 
-# 		np.random.seed(seed)
-# 		fftmals = level_sim.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, anisotropies=anisotropies, reverse=True)
-# 		field = fftmals.simnewls()
-# 		rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
-# 		Y1 = st.norm.ppf(rfield)
+		np.random.seed(seed)
+		fftmals = level_sim_conditional.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, anisotropies=anisotropies, reverse=True)
+		field = fftmals.simnewls()
+		rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
+		Y1 = st.norm.ppf(rfield)
 
-# 	plt.figure()
-# 	plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
-# 	plt.colorbar()
-# 	plt.savefig(r'ex4_linear_{}.png'.format(c), dpi=250)
-# 	plt.clf()
-# 	plt.close()
+	# plot field
+	plt.figure()
+	plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
+	plt.colorbar()
+	plt.savefig(r'ex4_linear_{}.png'.format(c), dpi=250)
+	plt.clf()
+	plt.close()
 
-# 	# # indicator??
-# 	# Y1 = np.where(Y1 < 0, Y1, np.nan)
+	# spast
+	vals = Y1[xyz[:,0], xyz[:,1]]
+	spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
+	spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
 
-# 	# spast
-# 	vals = Y1[xyz[:,0], xyz[:,1]]
-# 	spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
-# 	spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
-# 	spast.plt_stats()
-# 	plt.savefig('ex4_statsall_{}.png'.format(c), dpi=300)
-# 	plt.clf()
-# 	plt.close()
-
-# 	# spast from variofft
-# 	vfft = varioFFT.varioFFT2D(Y1, icode=1)
-
-# 	# rotate for major minor axes
-# 	vfft = scipy.ndimage.rotate(vfft, -25, axes=[0,1], reshape=False)
-
-# 	ws = 250
-# 	w = [int(vfft.shape[i]/2) for i in range(2)]
-# 	gh = vfft[w[0] - ws : w[0] + ws, w[1] - ws : w[1] + ws]
-
-# 	vl = gh[250, 250:500]
-# 	hl = gh[250:500, 250]
-# 	dl45 = gh[250: , 250:]
-# 	dl45 = np.diag(dl45)
-# 	dl135 = gh[:250 , 250:][::-1]
-# 	dl135 = np.diag(dl135)
-
-# 	# average ll
-# 	avvl = []
-# 	avhl = []
-# 	avdl45 = []
-# 	avdl135 = []
-# 	for i in range(21):
-# 		avvl.append(np.mean(vl[i*10 : (i+1)*10]))
-# 		avhl.append(np.mean(hl[i*10 : (i+1)*10]))
-# 		avdl45.append(np.mean(dl45[i*10 : (i+1)*10]))
-# 		avdl135.append(np.mean(dl135[i*10 : (i+1)*10]))
-# 	avvl = np.array(avvl)
-# 	avhl = np.array(avhl)
-# 	avdl45 = np.array(avdl45)
-# 	avdl135 = np.array(avdl135)
-# 	d = np.arange(5, avvl.shape[0]*10, 10)
-
-# 	paper_plot(Y1, spast.statlist_biv[0])#, d[:-3], avvl[:-3], avhl[:-3])
-# 	plt.savefig('ex4_stats_{}.png'.format(c), dpi=250)
-# 	plt.clf()
-# 	plt.close()
+	# plot
+	paper_plot(Y1, spast.statlist_biv[0])
+	plt.savefig('ex4_stats_{}.png'.format(c), dpi=250)
+	plt.clf()
+	plt.close()
 
 
-# # example 5: Linearly changing exponential variogram with range from 20 to 80 and anisotropy in either
-# # high and low values
-# covmods = []
-# anisotropies = []
-# nlev = 40
-# ranges = np.linspace(0.0, 1, nlev)#[::-1]
-# r1 = 80
-# r2 = 5
-# a1 = 0.5
-# a2 = 0.1
-# alp1 = 25
-# alp2 = 70
-# for ii, r in enumerate(ranges):
-# 	r = (1- ranges[ii])*r1 + ranges[ii]*r2
-# 	af = (1- ranges[ii])*a1 + ranges[ii]*a2
-# 	alp = (1- ranges[ii])*alp1 + ranges[ii]*alp2
-# 	# if ii < nlev/2:
-# 	# 	ani = (1, af, 25)
-# 	# else:
-# 	# 	ani = (1, af, 70)
-# 	ani = (1, af, alp)
-# 	covmod =  '0.01 Nug(0.0) + 0.99 Exp({})'.format(r)
-# 	covmods.append(covmod)
-# 	anisotropies.append(ani)
-# print(covmods)
+# example 5: Linearly changing exponential variogram with range from 20 to 80 and anisotropy in either
+# high and low values
+covmods = []
+anisotropies = []
+nlev = 40
+ranges = np.linspace(0.0, 1, nlev)#[::-1]
+r1 = 80
+r2 = 5
+a1 = 0.5
+a2 = 0.1
+alp1 = 25
+alp2 = 70
+for ii, r in enumerate(ranges):
+	r = (1- ranges[ii])*r1 + ranges[ii]*r2
+	af = (1- ranges[ii])*a1 + ranges[ii]*a2
+	alp = (1- ranges[ii])*alp1 + ranges[ii]*alp2
+	ani = (1, af, alp)
+	covmod =  '0.01 Nug(0.0) + 0.99 Exp({})'.format(r)
+	covmods.append(covmod)
+	anisotropies.append(ani)
+print(covmods)
 
-# np.random.seed(seed)
-# fftmals = level_sim.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, anisotropies=anisotropies, reverse=True)
-# field = fftmals.simnewls()
-# rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
-# Y1 = st.norm.ppf(rfield)
+np.random.seed(seed)
+fftmals = level_sim_conditional.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, anisotropies=anisotropies, reverse=True)
+field = fftmals.simnewls()
+rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
+Y1 = st.norm.ppf(rfield)
 
-# plt.figure()
-# plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
-# plt.colorbar()
-# plt.savefig(r'ex5_linear2.png', dpi=250)
-# plt.clf()
-# plt.close()
+# plot field
+plt.figure()
+plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
+plt.colorbar()
+plt.savefig(r'ex5_linear2.png', dpi=250)
+plt.clf()
+plt.close()
 
-# # spast
-# vals = Y1[xyz[:,0], xyz[:,1]]
+# spast
+vals = Y1[xyz[:,0], xyz[:,1]]
+spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
+spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
 
-# spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
-# spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
-# spast.plt_stats()
-# plt.savefig('ex5_statsall2.png', dpi=300)
-# plt.clf()
-# plt.close()
-
-# # spast from variofft
-# vfft = varioFFT.varioFFT2D(Y1, icode=1)
-# # rotate for major minor axes
-# vfft = scipy.ndimage.rotate(vfft, -25, axes=[0,1], reshape=False)
-# ws = 250
-# w = [int(vfft.shape[i]/2) for i in range(2)]
-# gh = vfft[w[0] - ws : w[0] + ws, w[1] - ws : w[1] + ws]
-
-# vl = gh[250, 250:500]
-# hl = gh[250:500, 250]
-# dl45 = gh[250: , 250:]
-# dl45 = np.diag(dl45)
-# dl135 = gh[:250 , 250:][::-1]
-# dl135 = np.diag(dl135)
-
-# # average ll
-# avvl = []
-# avhl = []
-# avdl45 = []
-# avdl135 = []
-# for i in range(21):
-# 	avvl.append(np.mean(vl[i*10 : (i+1)*10]))
-# 	avhl.append(np.mean(hl[i*10 : (i+1)*10]))
-# 	avdl45.append(np.mean(dl45[i*10 : (i+1)*10]))
-# 	avdl135.append(np.mean(dl135[i*10 : (i+1)*10]))
-# avvl = np.array(avvl)
-# avhl = np.array(avhl)
-# avdl45 = np.array(avdl45)
-# avdl135 = np.array(avdl135)
-# d = np.arange(5, avvl.shape[0]*10, 10)
-
-# paper_plot(Y1, spast.statlist_biv[0])#, d[:-3], avvl[:-3], avhl[:-3])
-# plt.savefig('ex5_stats2.png', dpi=250)
-# plt.clf()
-# plt.close()
+# plot
+paper_plot(Y1, spast.statlist_biv[0])
+plt.savefig('ex5_stats2.png', dpi=250)
+plt.clf()
+plt.close()
 
 
-# # example 6: Linearly changing variogram model with range from 20 to 80 
-# covmods = []
-# anisotropies = []
-# nlev = 40
-# ranges = np.linspace(0.01, 0.99, nlev)[::-1]
-# nugg = 0.01
-# for ii, r in enumerate(ranges):
+# example 6: Linearly changing variogram model with range from 20 to 80 
+covmods = []
+anisotropies = []
+nlev = 40
+ranges = np.linspace(0.01, 0.99, nlev)[::-1]
+nugg = 0.01
+for ii, r in enumerate(ranges):
 	
-# 	covmod =  '{} Nug(0.0) + {} Gau(15) + {} Exp(80)'.format(nugg, 1 - ranges[ii] - nugg/2, ranges[ii] - nugg/2)
-# 	covmods.append(covmod)
+	covmod =  '{} Nug(0.0) + {} Gau(15) + {} Exp(80)'.format(nugg, 1 - ranges[ii] - nugg/2, ranges[ii] - nugg/2)
+	covmods.append(covmod)
 	
-# print(covmods)
+print(covmods)
 
-# np.random.seed(seed)
-# fftmals = level_sim.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, reverse=True)
-# field = fftmals.simnewls()
-# rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
-# Y1 = st.norm.ppf(rfield)
+np.random.seed(seed)
+fftmals = level_sim_conditional.FFTMA_LS(domainsize=(1000, 1000), covmods=covmods, reverse=True)
+field = fftmals.simnewls()
+rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
+Y1 = st.norm.ppf(rfield)
 
-# plt.figure()
-# plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
-# plt.colorbar()
-# plt.savefig(r'ex6_linear_2.png', dpi=250)
-# plt.clf()
-# plt.close()
+# plot field
+plt.figure()
+plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
+plt.colorbar()
+plt.savefig(r'ex6_linear_2.png', dpi=250)
+plt.clf()
+plt.close()
 
-# # spast
-# vals = Y1[xyz[:,0], xyz[:,1]]
+# spast
+vals = Y1[xyz[:,0], xyz[:,1]]
+spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
+spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
 
-# spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
-# spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
-# spast.plt_stats()
-# plt.savefig('ex6_statsall_2.png', dpi=300)
-# plt.clf()
-# plt.close()
-
-# # spast from variofft
-# vfft = varioFFT.varioFFT2D(Y1, icode=1)
-
-# ws = 250
-# w = [int(vfft.shape[i]/2) for i in range(2)]
-# gh = vfft[w[0] - ws : w[0] + ws, w[1] - ws : w[1] + ws]
-
-# vl = gh[250, 250:500]
-# hl = gh[250:500, 250]
-# dl45 = gh[250: , 250:]
-# dl45 = np.diag(dl45)
-# dl135 = gh[:250 , 250:][::-1]
-# dl135 = np.diag(dl135)
-
-# # average ll
-# avvl = []
-# avhl = []
-# avdl45 = []
-# avdl135 = []
-# for i in range(21):
-# 	avvl.append(np.mean(vl[i*10 : (i+1)*10]))
-# 	avhl.append(np.mean(hl[i*10 : (i+1)*10]))
-# 	avdl45.append(np.mean(dl45[i*10 : (i+1)*10]))
-# 	avdl135.append(np.mean(dl135[i*10 : (i+1)*10]))
-# avvl = np.array(avvl)
-# avhl = np.array(avhl)
-# avdl45 = np.array(avdl45)
-# avdl135 = np.array(avdl135)
-# d = np.arange(5, avvl.shape[0]*10, 10)
-
-# paper_plot(Y1, spast.statlist_biv[0])#, d[:-3], avvl[:-3], avhl[:-3])
-# plt.savefig('ex6_stats_2.png', dpi=250)
-# plt.clf()
-# plt.close()
+# plot
+paper_plot(Y1, spast.statlist_biv[0])
+plt.savefig('ex6_stats_2.png', dpi=250)
+plt.clf()
+plt.close()
 
 # example 7: Linearly changing variogram model with range 50
 covmods = []
@@ -689,6 +475,7 @@ field = fftmals.simnewls()
 rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
 Y1 = st.norm.ppf(rfield)
 
+# plot field
 plt.figure()
 plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
 plt.colorbar()
@@ -698,48 +485,15 @@ plt.close()
 
 # spast
 vals = Y1[xyz[:,0], xyz[:,1]]
-
 spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
 spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
-spast.plt_stats()
-plt.savefig('ex7_statsall_2.png', dpi=300)
-plt.clf()
-plt.close()
 
-# spast from variofft
-vfft = varioFFT.varioFFT2D(Y1, icode=1)
-
-ws = 250
-w = [int(vfft.shape[i]/2) for i in range(2)]
-gh = vfft[w[0] - ws : w[0] + ws, w[1] - ws : w[1] + ws]
-
-vl = gh[250, 250:500]
-hl = gh[250:500, 250]
-dl45 = gh[250: , 250:]
-dl45 = np.diag(dl45)
-dl135 = gh[:250 , 250:][::-1]
-dl135 = np.diag(dl135)
-
-# average ll
-avvl = []
-avhl = []
-avdl45 = []
-avdl135 = []
-for i in range(21):
-	avvl.append(np.mean(vl[i*10 : (i+1)*10]))
-	avhl.append(np.mean(hl[i*10 : (i+1)*10]))
-	avdl45.append(np.mean(dl45[i*10 : (i+1)*10]))
-	avdl135.append(np.mean(dl135[i*10 : (i+1)*10]))
-avvl = np.array(avvl)
-avhl = np.array(avhl)
-avdl45 = np.array(avdl45)
-avdl135 = np.array(avdl135)
-d = np.arange(5, avvl.shape[0]*10, 10)
-
-paper_plot(Y1, spast.statlist_biv[0])#, d[:-3], avvl[:-3], avhl[:-3])
+# plot
+paper_plot(Y1, spast.statlist_biv[0])
 plt.savefig('ex7_stats_2.png', dpi=250)
 plt.clf()
 plt.close()
+
 
 # example 8: Linearly changing variogram model with changing range from 15 to 50
 covmods = []
@@ -762,6 +516,7 @@ field = fftmals.simnewls()
 rfield = (st.mstats.rankdata(field) - 0.5)/np.prod(field.shape)
 Y1 = st.norm.ppf(rfield)
 
+# plot field
 plt.figure()
 plt.imshow(Y1, origin='lower', interpolation='nearest', cmap='jet', vmin=-3.6, vmax=3.6)
 plt.colorbar()
@@ -771,45 +526,11 @@ plt.close()
 
 # spast
 vals = Y1[xyz[:,0], xyz[:,1]]
-
 spast = empspast_anisotropic.empspast_isotropic_unstructured(xyz, vals)
 spast.calc_stats(lagbounds=lb, ang_bounds_maj=[55, 75], ang_bounds_min=[145, 165])
-spast.plt_stats()
-plt.savefig('ex8_statsall_2.png', dpi=300)
-plt.clf()
-plt.close()
 
-# spast from variofft
-vfft = varioFFT.varioFFT2D(Y1, icode=1)
-
-ws = 250
-w = [int(vfft.shape[i]/2) for i in range(2)]
-gh = vfft[w[0] - ws : w[0] + ws, w[1] - ws : w[1] + ws]
-
-vl = gh[250, 250:500]
-hl = gh[250:500, 250]
-dl45 = gh[250: , 250:]
-dl45 = np.diag(dl45)
-dl135 = gh[:250 , 250:][::-1]
-dl135 = np.diag(dl135)
-
-# average ll
-avvl = []
-avhl = []
-avdl45 = []
-avdl135 = []
-for i in range(21):
-	avvl.append(np.mean(vl[i*10 : (i+1)*10]))
-	avhl.append(np.mean(hl[i*10 : (i+1)*10]))
-	avdl45.append(np.mean(dl45[i*10 : (i+1)*10]))
-	avdl135.append(np.mean(dl135[i*10 : (i+1)*10]))
-avvl = np.array(avvl)
-avhl = np.array(avhl)
-avdl45 = np.array(avdl45)
-avdl135 = np.array(avdl135)
-d = np.arange(5, avvl.shape[0]*10, 10)
-
-paper_plot(Y1, spast.statlist_biv[0])#, d[:-3], avvl[:-3], avhl[:-3])
+# plot
+paper_plot(Y1, spast.statlist_biv[0])
 plt.savefig('ex8_stats_2.png', dpi=250)
 plt.clf()
 plt.close()
