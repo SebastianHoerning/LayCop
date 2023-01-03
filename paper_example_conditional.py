@@ -19,19 +19,18 @@ from statsmodels.distributions.empirical_distribution import ECDF
 from helper_func import covariancefunction as covfun
 from helper_func import empspast_anisotropic
 import level_sim_conditional
-
+import gstools as gs
+import pykrige
 
 # SIMULATE
-example100 = False	# change to True for the example with 100 observations
 n_realisations = 10
 
 for s in range(n_realisations):
-	# example: linearly changing Exponential variogram with range from 5 to 80
 	covmods = []
 	nlev = 41 # has to be an odd number to get phi_(tau)=0
 	tau = np.linspace(0.0, 1, nlev)
-	r1 = 80
-	r2 = 5
+	r1 = 40
+	r2 = 4
 	for ii, r in enumerate(tau):
 		r = (1- tau[ii])*r1 + tau[ii]*r2
 		covmod =  '0.01 Nug(0.0) + 0.99 Exp({})'.format(r)
@@ -39,53 +38,28 @@ for s in range(n_realisations):
 	print(covmods)
 
 	# initialize FFTMA_LS with the covmodes defined above
-	fftmals = FFTMA_LS(domainsize=(1000, 1000), covmods=covmods)
+	fftmals = level_sim_conditional.FFTMA_LS(domainsize=(500, 500), covmods=covmods)
 
-	# nsamp = 100
-	# xy = np.ones([nsamp, 2])*99999
-	# aa = np.zeros([1,2])
-	# i = 0
-	# while i < nsamp:
-	# 	aa[0,:] = np.random.randint((850, 850), size=2) + [75, 75]
-	# 	dst = sp.distance.cdist(xy, aa, metric='euclidean')
-	# 	if np.min(dst) > 30:
-	# 		xy[i,:] = aa[0,:]
-	# 		i = i+1
-	# xy = xy.astype(int)
+	# read conditioning values
+	xy = np.load('data/small_xy.npy')
+	condfield = np.load('data/small_sample_field.npy')
+	cv = condfield[xy[:,0], xy[:,1]]
+
+
+	# OK simulation for tau0fields
+	ok_cov = gs.Exponential(dim=2, var=1, len_scale=22, nugget=0.01)
+	domainsize = (532, 532)
+	gridx = np.arange(0.0, domainsize[0], 1)
+	gridy = np.arange(0.0, domainsize[1], 1)
+
+	ok_data = pykrige.OrdinaryKriging(xy[:,0], xy[:,1], cv, ok_cov)
+	z_data, s_data = ok_data.execute("grid", gridx, gridy)
+	z_data = z_data.data.T
 	
-	if example100:
-		# EXAMPLE WITH 100 OBSERVATIONS
-		# load conditioning point coords and values
-		xy = np.load('xy_100.npy')
-		condfield = np.load('sample_field.npy')
-		cv = condfield[xy[:,0], xy[:,1]]
-		# start RM
-		RM = RMWS(domainsize=fftmals.sqrtFFTQ[0].shape, covmod=covmods[(nlev - 1)//2], nFields=10,
-				cp=xy, cv=cv, norm=0.2)
-		RM()
-		tau0fields = RM.finalFields
-		# np.save(r'tau0field_{}.npy'.format(s), tau0fields)
+	tau0fields = RM.finalFields
 
-		# start conditional layer simulation
-		# return the field and the corresponding random numbers
-		Y = fftmals.condsim(xy, cv, tau0fields, nsteps=100, kbw=50)
-
-	else:
-		# EXAMPLE WITH 30 OBSERVATIONS
-		# load conditioning point coords and values
-		xy = np.load('xy.npy')
-		condfield = np.load('sample_field.npy')
-		cv = condfield[xy[:,0], xy[:,1]]
-		# start RM
-		RM = RMWS(domainsize=fftmals.sqrtFFTQ[0].shape, covmod=covmods[(nlev - 1)//2], nFields=5,
-				cp=xy, cv=cv, norm=0.2)
-		RM()
-		tau0fields = RM.finalFields
-		# np.save(r'tau0field_{}.npy'.format(s), tau0fields)
-
-		# start conditional layer simulation
-		# return the field and the corresponding random numbers
-		Y = fftmals.condsim(xy, cv, tau0fields, nsteps=30, kbw=50)
+	# start conditional layer cop simulation
+	Y = fftmals.condsim(xy, cv, tau0fields, nsteps=70, kbw=10)
 
 	# plot the results
 	sim_cv = Y[xy[:, 0], xy[:, 1]]

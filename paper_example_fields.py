@@ -16,7 +16,6 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import scipy.stats as st
 from statsmodels.distributions.empirical_distribution import ECDF
-from helper_func import covariancefunction as covfun
 from helper_func import empspast_anisotropic
 import level_sim_conditional
 
