@@ -21,11 +21,25 @@ from helper_func import fftma
 import level_sim_conditional
 import gstools as gs
 
-# SIMULATE
-n_realisations = 2
+# SIMULATE CONDITIONAL FIELDS
+# read conditioning values
+xy = np.load('data/small_xy.npy')
+condfield = np.load('data/small_sample_field.npy')
+cv = condfield[xy[:,0], xy[:,1]]
+
+# plot field that is sampled 
+plt.figure()
+plt.imshow(condfield, interpolation='nearest', origin='lower', cmap='jet', vmin=-3.6, vmax=3.6)
+plt.plot(xy[:,1], xy[:,0], 'x')
+plt.colorbar()
+plt.savefig(r'sampled_field.png')
+plt.clf()
+plt.close()
+
+# number of conditional realizations
+n_realisations = 10
 
 cond_fields = []
-
 for s in range(n_realisations):
 	print('Simulate conditional realization # {}'.format(s))
 	covmods = []
@@ -41,12 +55,6 @@ for s in range(n_realisations):
 
 	# initialize FFTMA_LS with the covmodes defined above
 	fftmals = level_sim_conditional.FFTMA_LS(domainsize=(500, 500), covmods=covmods)
-
-	# read conditioning values
-	xy = np.load('data/small_xy.npy')
-	condfield = np.load('data/small_sample_field.npy')
-	cv = condfield[xy[:,0], xy[:,1]]
-
 
 	# OK for cv
 	ok_cov = gs.Exponential(dim=2, var=1, len_scale=22, nugget=0.01)
