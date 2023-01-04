@@ -11,6 +11,7 @@
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
+import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.axes_grid1 import ImageGrid
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
