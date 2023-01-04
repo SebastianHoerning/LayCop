@@ -23,7 +23,10 @@ import gstools as gs
 # SIMULATE
 n_realisations = 2
 
+cond_fields = []
+
 for s in range(n_realisations):
+	print('Simulate conditional realization # {}'.format(s))
 	covmods = []
 	nlev = 41 # has to be an odd number to get phi_(tau)=0
 	tau = np.linspace(0.0, 1, nlev)
@@ -71,6 +74,7 @@ for s in range(n_realisations):
 
 	# start conditional layer cop simulation
 	Y = fftmals.condsim(xy, cv, tau0fields, nsteps=70, kbw=10)
+	cond_fields.append(Y)
 
 	# plot the results
 	sim_cv = Y[xy[:, 0], xy[:, 1]]
@@ -88,9 +92,57 @@ for s in range(n_realisations):
 
 	plt.figure()
 	plt.imshow(Y, interpolation='nearest', origin='lower', cmap='jet', vmin=-3.6, vmax=3.6)
+	plt.plot(xy[:,1], xy[:,0], 'x')
 	plt.colorbar()
 	plt.savefig(r'csimfield_{}.png'.format(s))
 	plt.clf()
 	plt.close()
 
+	# save the conditional field
 	np.save('csfield_{}.npy'.format(s), Y)
+
+# plot mean and std
+cond_fields = np.array(cond_fields)
+
+plt.figure()
+plt.imshow(np.mean(cond_fields, axis=0), interpolation='nearest', origin='lower', cmap='jet', vmin=-2.1, vmax=2.1)
+plt.plot(xy[:,1], xy[:,0], 'x')
+plt.colorbar()
+plt.savefig('cond_mean.png', dpi=250)
+plt.clf()
+plt.close()
+
+plt.figure()
+plt.imshow(np.std(cond_fields, axis=0), interpolation='nearest', origin='lower', cmap='jet', vmin=0, vmax=1)
+plt.plot(xy[:,1], xy[:,0], 'x')
+plt.colorbar()
+plt.savefig('cond_std.png', dpi=250)
+plt.clf()
+plt.close()
+
+df = {}
+df['l'] = []
+df['val'] = []
+for i in range(n_realisations):
+	df['l'].append(list(np.arange(cv.shape[0])))
+	df['val'].append(list(cond_fields[i][xy[:,0], xy[:,1]]))
+df['l'] = np.concatenate(df['l'])
+df['val'] = np.concatenate(df['val'])
+df = pd.DataFrame(data=df, index=np.arange(n_realisations*cv.shape[0]))
+df = df.sort_values(by='l').reset_index(drop=True)
+dff = []
+for i in range(cv.shape[0]):
+	dff.append(df.loc[df.l == i].val)
+
+fig, ax = plt.subplots(figsize=(24, 14))
+for label in (ax.get_xticklabels() + ax.get_yticklabels()):
+	label.set_fontsize(24)
+
+ax.boxplot(dff)
+ax.plot(np.arange(1,cv.shape[0]+1), cv, 'x', ms=18, mew=2)
+plt.ylabel('values', fontsize=24)
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.savefig(r'box_conditioning_values.png', dpi=250)
+plt.clf()
+plt.close()
